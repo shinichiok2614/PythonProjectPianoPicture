@@ -1,111 +1,42 @@
 import cv2
 import tkinter as tk
-from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+from tkinter import filedialog, simpledialog, messagebox
 
-class VideoCropper:
-    def __init__(self, master):
-        self.master = master
-        self.master.title("Video Cropper with Preview")
+def crop_video():
+    filepath = filedialog.askopenfilename(title="Chọn video", filetypes=[("Video files", "*.mp4 *.avi *.mov")])
+    if not filepath:
+        return
 
-        self.cap = None
-        self.frame = None
-        self.photo = None
-        self.rect_start = None
-        self.rect_end = None
-        self.cropping = False
-        self.crop_coords = None
+    cap = cv2.VideoCapture(filepath)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
-        # GUI
-        tk.Button(master, text="Chọn video", command=self.load_video).pack()
-        self.canvas = tk.Canvas(master, width=640, height=360)
-        self.canvas.pack()
-        self.canvas.bind("<Button-1>", self.start_crop)
-        self.canvas.bind("<B1-Motion>", self.draw_crop)
-        self.canvas.bind("<ButtonRelease-1>", self.end_crop)
-        tk.Button(master, text="Crop và lưu video", command=self.save_cropped_video).pack(pady=10)
+    # Nhập crop
+    left = simpledialog.askinteger("Crop", "Left (px):", minvalue=0, maxvalue=width)
+    right = simpledialog.askinteger("Crop", "Right (px):", minvalue=0, maxvalue=width)
+    top = simpledialog.askinteger("Crop", "Top (px):", minvalue=0, maxvalue=height)
+    bottom = simpledialog.askinteger("Crop", "Bottom (px):", minvalue=0, maxvalue=height)
 
-    def load_video(self):
-        path = filedialog.askopenfilename(title="Chọn video", filetypes=[("Video files", "*.mp4 *.avi *.mov")])
-        if not path:
-            return
-        self.cap = cv2.VideoCapture(path)
-        self.video_path = path
-        self.play_video()
+    output_path = filedialog.asksaveasfilename(title="Save video as", defaultextension=".mp4", filetypes=[("MP4", "*.mp4")])
+    if not output_path:
+        return
 
-    def play_video(self):
-        if not self.cap:
-            return
-        ret, frame = self.cap.read()
-        if ret:
-            self.frame = frame
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(frame_rgb)
-            img.thumbnail((640,360))
-            self.photo = ImageTk.PhotoImage(img)
-            self.canvas.create_image(0,0, anchor=tk.NW, image=self.photo)
-        self.master.after(30, self.play_video)  # khoảng 30ms ~ 33fps
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (right-left, bottom-top))
 
-    # Bắt đầu crop
-    def start_crop(self, event):
-        self.rect_start = (event.x, event.y)
-        self.cropping = True
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        cropped = frame[top:bottom, left:right]
+        out.write(cropped)
 
-    # Vẽ rectangle
-    def draw_crop(self, event):
-        if self.cropping:
-            self.rect_end = (event.x, event.y)
-            self.canvas.delete("rect")
-            self.canvas.create_rectangle(self.rect_start[0], self.rect_start[1],
-                                         self.rect_end[0], self.rect_end[1],
-                                         outline="red", width=2, tag="rect")
-
-    # Kết thúc crop
-    def end_crop(self, event):
-        self.rect_end = (event.x, event.y)
-        self.cropping = False
-        # Lưu crop coords theo tỉ lệ video gốc
-        if self.frame is not None:
-            w_ratio = self.frame.shape[1] / 640
-            h_ratio = self.frame.shape[0] / 360
-            x1 = int(self.rect_start[0] * w_ratio)
-            y1 = int(self.rect_start[1] * h_ratio)
-            x2 = int(self.rect_end[0] * w_ratio)
-            y2 = int(self.rect_end[1] * h_ratio)
-            self.crop_coords = (min(x1,x2), min(y1,y2), max(x1,x2), max(y1,y2))
-            print("Crop coords:", self.crop_coords)
-
-    def save_cropped_video(self):
-        if not self.cap or not self.crop_coords:
-            messagebox.showwarning("Warning", "Chưa chọn vùng crop!")
-            return
-
-        self.cap.release()
-        self.cap = cv2.VideoCapture(self.video_path)
-        x1,y1,x2,y2 = self.crop_coords
-        width = x2 - x1
-        height = y2 - y1
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-
-        save_path = filedialog.asksaveasfilename(title="Save video as", defaultextension=".mp4",
-                                                 filetypes=[("MP4", "*.mp4")])
-        if not save_path:
-            return
-
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(save_path, fourcc, fps, (width, height))
-
-        while True:
-            ret, frame = self.cap.read()
-            if not ret:
-                break
-            cropped = frame[y1:y2, x1:x2]
-            out.write(cropped)
-
-        self.cap.release()
-        out.release()
-        messagebox.showinfo("Done", "Crop video xong!")
+    cap.release()
+    out.release()
+    messagebox.showinfo("Done", "Crop video xong!")
 
 root = tk.Tk()
-app = VideoCropper(root)
+root.title("Video Cropper")
+tk.Button(root, text="Chọn Video và Crop", command=crop_video, width=30, height=2).pack(pady=20)
 root.mainloop()

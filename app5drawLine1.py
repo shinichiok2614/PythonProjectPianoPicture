@@ -30,7 +30,7 @@ class PianoLineDrawerWhite:
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         tk.Button(self.left_frame, text="Chọn folder", command=self.load_folder).pack(pady=5)
-        self.listbox = tk.Listbox(self.left_frame)
+        self.listbox = tk.Listbox(self.left_frame, width=30, exportselection=False)
         self.listbox.pack(fill=tk.Y, expand=True)
         self.listbox.bind("<<ListboxSelect>>", self.on_select_image)
 
